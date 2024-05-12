@@ -1,0 +1,142 @@
+import sys
+import os
+import subprocess
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QFileDialog, QRadioButton
+from PyQt6.QtGui import QIcon
+
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle('Plagiarism Checker')
+        self.setGeometry(100, 100, 400, 300)
+        self.setWindowIcon(QIcon('icon.png'))
+        self.initUI()
+
+    def initUI(self):
+        layout = QVBoxLayout()
+
+        radio_label = QLabel("Select verification type:")
+        layout.addWidget(radio_label)
+
+        self.code_radio = QRadioButton('Code')
+        self.text_radio = QRadioButton('Text')
+        self.code_radio.setChecked(True)
+        layout.addWidget(self.code_radio)
+        layout.addWidget(self.text_radio)
+
+        file1_label = QLabel("Select first file:")
+        layout.addWidget(file1_label)
+
+        self.file1_label = QLabel("No file selected")
+        layout.addWidget(self.file1_label)
+
+        self.file1_button = QPushButton()
+        self.file1_button.setIcon(QIcon('file_icon.png'))
+        self.file1_button.setStyleSheet("background-color: #2196F3; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px;")
+        self.file1_button.setToolTip('Select File 1')
+        self.file1_button.clicked.connect(self.select_file1)
+        layout.addWidget(self.file1_button)
+
+        file2_label = QLabel("Select second file:")
+        layout.addWidget(file2_label)
+
+        self.file2_label = QLabel("No file selected")
+        layout.addWidget(self.file2_label)
+
+        self.file2_button = QPushButton()
+        self.file2_button.setIcon(QIcon('file_icon.png'))
+        self.file2_button.setStyleSheet("background-color: #2196F3; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px;")
+        self.file2_button.setToolTip('Select File 2')
+        self.file2_button.clicked.connect(self.select_file2)
+        layout.addWidget(self.file2_button)
+
+        self.status_label = QLabel()
+        layout.addWidget(self.status_label)
+
+        self.check_button = QPushButton('Check Plagiarism')
+        self.check_button.setStyleSheet("background-color: #4CAF50; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px;")
+        self.check_button.clicked.connect(self.check_plagiarism)
+        layout.addWidget(self.check_button)
+
+        self.setLayout(layout)
+
+        self.verification_type = 1
+        self.file1_path = None
+        self.file2_path = None
+
+    def select_file1(self):
+        filename, _ = QFileDialog.getOpenFileName(self, 'Select File 1')
+        if filename:
+            self.file1_path = filename
+            self.file1_label.setText(os.path.basename(filename))
+
+    def select_file2(self):
+        filename, _ = QFileDialog.getOpenFileName(self, 'Select File 2')
+        if filename:
+            self.file2_path = filename
+            self.file2_label.setText(os.path.basename(filename))
+
+
+    def check_plagiarism(self):
+        if self.file1_path and self.file2_path:
+            try:
+                # Extract verification type and file paths from input string
+                verification_type = 1 if self.code_radio.isChecked() else 0
+                input_str = f"{verification_type},{self.file1_path},{self.file2_path}"
+
+                # Full path to g++ compiler
+                cpp_executable = r'C:\MinGW\bin\g++'
+
+                # Full paths to input files
+                file1_fullpath = os.path.abspath(self.file1_path)
+                file2_fullpath = os.path.abspath(self.file2_path)
+
+                # Debug: Print input string
+                print("Input:", input_str)
+
+                # Compile main.cpp to generate the executable 'SDA.exe'
+                compile_process = subprocess.run(
+                    [cpp_executable, "-o", "SDA.exe", r"C:\Users\User\CLionProjects\SDA\main.cpp"],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                print("Compilation process:", compile_process)  # Debug: Print compile process details
+
+                if compile_process.returncode != 0:
+                    # Compilation failed, display error message
+                    error_output = compile_process.stderr.strip()
+                    self.status_label.setText(f"Compilation failed\nError output: {error_output}")
+                    return
+
+                # Execute the generated 'SDA.exe' executable with input data
+                execute_process = subprocess.run(["SDA.exe"] + input_str.split(','),
+                                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                print("Execution process:", execute_process)  # Debug: Print execute process details
+
+                if execute_process.returncode != 0:
+                    # Execution failed, display error message
+                    error_output = execute_process.stderr.strip()
+                    self.status_label.setText(f"Execution failed\nError output: {error_output}")
+                    return
+
+                result_file_path = os.path.join(os.getcwd(), "plagiarism_result.txt")
+                if os.path.exists(result_file_path):
+                    with open(result_file_path, "r") as file:
+                        result_text = file.read()
+                        self.status_label.setText(result_text)
+                else:
+                    self.status_label.setText("Result file not found.")
+
+
+            except Exception as e:
+                self.status_label.setText(f"Error: {e}")
+        else:
+            self.status_label.setText('Error: Please select both files')
+
+
+def main():
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
+
+if __name__ == '__main__':
+    main()
